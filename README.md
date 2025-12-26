@@ -334,3 +334,47 @@ After reaching the UI the first time you can login with username: admin and the 
 
 kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
 ```
+3. Setup ingress resource to expose argocd-server service to expose dashboard:
+```
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argocd-ingress
+  namespace: argocd
+  annotations:
+    # Specify the cluster issuer created previously to use for the ingress
+    cert-manager.io/cluster-issuer: letsencrypt-nginx-cert
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/ssl-passthrough: "true" # Make pod do SSL termination
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS" # Force Ingress to pod communication to be HTTPS
+spec:
+  tls:
+    - hosts:
+      # Specify the hosts to use for the ingress - same as the host in the ingress resource
+      - argocd.samsarian.com
+      # Specify the secret name to use for the ingress - this will be dynamically created by cert-manager
+      secretName: argocd-server-tls
+  ingressClassName: nginx
+  rules:
+    - host: argocd.samsarian.com
+      http:
+        paths:
+          - pathType: Prefix
+            backend:
+              service:
+                name: argocd-server
+                port:
+                  number: 443
+            path: /
+
+```
+4. Apply the ingress resource: `kubectl apply -f argocd-ingress.yaml`
+5. Verify ingress is working: `curl https://argocd.samsarian.com/`
+6. Login to the argocd dashboard with the username: admin and the password generated during the installation: `kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d`
+7. Create a new application following the instructions here: https://medium.com/@muppedaanvesh/a-hands-on-guide-to-argocd-on-kubernetes-part-1-%EF%B8%8F-7a80c1b0ac98
+8. Once done, test argo is functioning correctly by creating a manifest and deploy it to the cluster. E.g. `k run new-pod --image=nginx --dry-run=client -o yaml > new-pod.yaml && k apply -f new-pod.yaml`
+9. Check dashboard to verify the pod has been deployed.
+
+### Install Prometheus & Grafana for Cluster Monitoring
