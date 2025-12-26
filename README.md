@@ -1,11 +1,15 @@
-Sources:
+# EKS Project
+## Sources
 - https://medium.com/@muppedaanvesh/%EF%B8%8F-kubernetes-ingress-securing-the-ingress-using-cert-manager-part-7-366f1f127fd6
 - https://medium.com/@chandan.chanddu/installing-nginx-ingress-controller-in-eks-using-helm-41913011ef49
-
+- https://medium.com/@KushanJanith/host-your-web-apps-on-eks-with-nginx-ingress-and-external-dns-3721622e271f
+## Steps
+### Install ingress-nginx via helm
 1. helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
 2. helm pull --untar ingress-nginx/ingress-nginx
-3. 
-```helm install ingress-nginx \                  
+3. Install ingress-nginx:
+```
+helm install ingress-nginx \                  
   ./ingress-nginx \          
   --namespace ingress-nginx \
   --create-namespace \
@@ -58,7 +62,7 @@ If TLS is enabled for the Ingress, a Secret containing the certificate and key m
     tls.key: <base64 encoded key>
   type: kubernetes.io/tls
 ```
-4. Create ingress resource like below:
+4. Create ingress resource like below to verify the ingress-nginx installation:
 ```
 
 ---
@@ -80,7 +84,8 @@ spec:
                   number: 80
             path: /
 ```
-5. Install cert-manager:
+### Install cert-manager via helm
+5. Install cert-manager:  
 a. Add the cert-manager repository:
 ```
 helm repo add jetstack https://charts.jetstack.io
@@ -92,10 +97,11 @@ eks             https://aws.github.io/eks-charts
 ingress-nginx   https://kubernetes.github.io/ingress-nginx
 jetstack        https://charts.jetstack.io       
 ```
-b. Get latest version of cert-manager: helm repo update
-c. Pull the cert-manager chart: helm pull --untar jetstack/cert-manager
+b. Get latest version of cert-manager: `helm repo update`  
+c. Pull the cert-manager chart: `helm pull --untar jetstack/cert-manager`  
 d. Install cert-manager:
-``` $ helm install cert-manager ./cert-manager --namespace cert-manager --create-namespace --version v1.19.2 --set installCRDs=true
+``` 
+$ helm install cert-manager ./cert-manager --namespace cert-manager --create-namespace --version v1.19.2 --set installCRDs=true
 NAME: cert-manager
 LAST DEPLOYED: Thu Dec 25 02:01:03 2025
 NAMESPACE: cert-manager
@@ -146,6 +152,185 @@ spec:
         ingress:
           class: nginx
 ```
-6a. Apply the cluster issuer: kubectl apply -f cluster-issuer.yaml
+6a. Apply the cluster issuer: kubectl apply -f cluster-issuer.yaml  
 
+### Secure the ingress with cert-manager
 7. Update the ingress resource to use the cluster issuer:
+
+```
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: example
+  annotations: # NEW
+    # NEW:Specify the cluster issuer created previously to use for the ingress
+    cert-manager.io/cluster-issuer: letsencrypt-nginx-cert
+spec:
+  tls: # NEW TLS section to secure the ingress
+    - hosts:
+      # NEW: Specify the hosts to use for the ingress - same as the host in the ingress resource
+      - www.samsarian.com
+      # NEW: Specify the secret name  to use for the ingress - this will be dynamically created by cert-manager
+      secretName: letsencrypt-nginx-cert-samsarian
+  ingressClassName: nginx
+  rules:
+    - host: www.samsarian.com
+      http:
+        paths:
+          - pathType: Prefix
+            backend:
+              service:
+                name: nginx
+                port:
+                  number: 80
+            path: /
+```
+8. Apply the ingress resource: `kubectl apply -f test-secure-ingress.yaml`
+9. Verify certificate has been created `kubectl describe certificate
+```
+kubectl describe certificate
+Name:         letsencrypt-nginx-cert-samsarian
+Namespace:    default
+Labels:       <none>
+Annotations:  <none>
+API Version:  cert-manager.io/v1
+Kind:         Certificate
+Metadata:
+  Creation Timestamp:  2025-12-25T02:17:04Z
+  Generation:          1
+  Owner References:
+    API Version:           networking.k8s.io/v1
+    Block Owner Deletion:  true
+    Controller:            true
+    Kind:                  Ingress
+    Name:                  example
+    UID:                   1e3668bc-f991-43e5-9cfd-e1418504d007
+  Resource Version:        254268
+  UID:                     7a6b2e2d-df35-46c8-ba26-6ecfc6a5d4e3
+Spec:
+  Dns Names:
+    www.samsarian.com
+  Issuer Ref:
+    Group:      cert-manager.io
+    Kind:       ClusterIssuer
+    Name:       letsencrypt-nginx-cert
+  Secret Name:  letsencrypt-nginx-cert-samsarian
+  Usages:
+    digital signature
+    key encipherment
+Status:
+  Conditions:
+    Last Transition Time:  2025-12-25T02:17:30Z
+    Message:               Certificate is up to date and has not expired
+    Observed Generation:   1
+    Reason:                Ready <<<
+    Status:                True <<<
+    Type:                  Ready
+  Not After:               2026-03-25T01:18:56Z
+  Not Before:              2025-12-25T01:18:57Z
+  Renewal Time:            2026-02-23T01:18:56Z <<<
+  Revision:                1
+Events:                    <none>
+```
+### Verify ingress works with HTTPS
+```
+curl https://www.samsarian.com/
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+<style>
+html { color-scheme: light dark; }
+body { width: 35em; margin: 0 auto;
+font-family: Tahoma, Verdana, Arial, sans-serif; }
+</style>
+</head>
+<body>
+<h1>Welcome to nginx!</h1>
+<p>If you see this page, the nginx web server is successfully installed and
+working. Further configuration is required.</p>
+
+<p>For online documentation and support please refer to
+<a href="http://nginx.org/">nginx.org</a>.<br/>
+Commercial support is available at
+<a href="http://nginx.com/">nginx.com</a>.</p>
+
+<p><em>Thank you for using nginx.</em></p>
+</body>
+</html>
+➜  prodse
+```
+
+### External DNS Installation via helm
+1. Add the external-dns repository: ```helm repo add external-dns https://kubernetes-sigs.github.io/external-dns/
+2. Pull the external-dns chart: `helm pull --untar external-dns/external-dns`
+3. Create AWS IAM role for external DNS with OIDC as seen here: https://medium.com/@KushanJanith/host-your-web-apps-on-eks-with-nginx-ingress-and-external-dns-3721622e271f
+3. Update the keys in the external-dns values.yaml file to include the following:
+```
+provider: aws
+
+domainFilters:
+  - your_domain_1.example.com
+  - your_domain_2.example.com
+serviceAccount:
+  create: true
+  name: external-dns
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::XXXXXXXXXXX:role/<iam_role_name>
+txtOwnerId: <name_of_your_cluster>
+
+```
+3. Install external-dns:
+```
+helm install external-dns ./external-dns --version 1.19.0 -f ./external-dns/values.yaml
+```
+
+4. Verify external-dns is installed:
+```
+kubectl get pods -n external-dns
+```
+5. Verify external-dns is working: `kubectl logs -n external-dns <pod_name>`
+
+6. Re-create ingress resource to verify external-dns is working:
+7. Check AWS console or external-dns logs to verify the DNS records have been created.
+```
+$ kubectl logs -n external-dns <pod_name>
+time="2025-12-26T01:38:06Z" level=info msg="All records are already up to date"
+time="2025-12-26T01:39:07Z" level=info msg="Applying provider record filter for domains: [samsarian.com. .samsarian.com.]"
+time="2025-12-26T01:39:08Z" level=info msg="Desired change: CREATE aaaa-www.samsarian.com TXT" profile=default zoneID=/hostedzone/Z00877263M8QB2Y7Z5R2A zoneName=samsarian.com.
+time="2025-12-26T01:39:08Z" level=info msg="Desired change: CREATE cname-www.samsarian.com TXT" profile=default zoneID=/hostedzone/Z00877263M8QB2Y7Z5R2A zoneName=samsarian.com.
+time="2025-12-26T01:39:08Z" level=info msg="Desired change: CREATE www.samsarian.com A" profile=default zoneID=/hostedzone/Z00877263M8QB2Y7Z5R2A zoneName=samsarian.com.
+time="2025-12-26T01:39:08Z" level=info msg="Desired change: CREATE www.samsarian.com AAAA" profile=default zoneID=/hostedzone/Z00877263M8QB2Y7Z5R2A zoneName=samsarian.com.
+time="2025-12-26T01:39:08Z" level=info msg="4 record(s) were successfully updated" profile=default zoneID=/hostedzone/Z00877263M8QB2Y7Z5R2A zoneName=samsarian.com.
+```
+
+
+### Install ArgoCD
+1. Add argoCD repo: `helm repo add argo https://argoproj.github.io/argo-helm`
+2. Download helm chart into local dir: `helm pull --untar argo/argo-cd`
+3. Install chart from local dir:
+```
+helm install argocd ./argo-cd --namespace argocd --create-namespace
+NAME: argocd
+LAST DEPLOYED: Fri Dec 26 19:05:42 2025
+NAMESPACE: argocd
+STATUS: deployed
+REVISION: 1
+TEST SUITE: None
+NOTES:
+In order to access the server UI you have the following options:
+
+1. kubectl port-forward service/argocd-server -n argocd 8080:443
+
+    and then open the browser on http://localhost:8080 and accept the certificate
+
+2. enable ingress in the values file `server.ingress.enabled` and either
+      - Add the annotation for ssl passthrough: https://argo-cd.readthedocs.io/en/stable/operator-manual/ingress/#option-1-ssl-passthrough
+      - Set the `configs.params."server.insecure"` in the values file and terminate SSL at your ingress: https://argo-cd.readthedocs.io/en/stable/operator-manual/ingress/#option-2-multiple-ingress-objects-and-hosts
+
+
+After reaching the UI the first time you can login with username: admin and the random password generated during the installation. You can find the password by running:
+
+kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
+```
