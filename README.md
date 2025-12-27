@@ -378,3 +378,10 @@ spec:
 9. Check dashboard to verify the pod has been deployed.
 
 ### Install Prometheus & Grafana for Cluster Monitoring
+1. Add repo for prometheus: `helm repo add prometheus https://prometheus-community.github.io/helm-charts`
+2. Pull latest version of repo: `helm repo update`
+3. Pull Prometheus chart into local dir: `helm pull --untar prometheus/prometheus`
+4. Install Prometheus chart from local dir: `helm install prometheus ./prometheus --namespace monitoring --create-namespace`
+5. Verify the installation: `kubectl get pods -n monitoring`
+
+

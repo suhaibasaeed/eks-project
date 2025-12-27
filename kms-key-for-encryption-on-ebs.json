@@ -1,0 +1,30 @@
+{
+      "Version":"2012-10-17",		 	 	 
+      "Statement": [
+        {
+          "Effect": "Allow",
+          "Action": [
+            "kms:CreateGrant",
+            "kms:ListGrants",
+            "kms:RevokeGrant"
+          ],
+          "Resource": ["arn:aws:kms:eu-west-2:373894414359:key/5ad783fa-06f5-48fd-968c-e32c2399d0c2"],
+          "Condition": {
+            "Bool": {
+              "kms:GrantIsForAWSResource": "true"
+            }
+          }
+        },
+        {
+          "Effect": "Allow",
+          "Action": [
+            "kms:Encrypt",
+            "kms:Decrypt",
+            "kms:ReEncrypt*",
+            "kms:GenerateDataKey*",
+            "kms:DescribeKey"
+          ],
+          "Resource": ["arn:aws:kms:eu-west-2:373894414359:key/5ad783fa-06f5-48fd-968c-e32c2399d0c2"]
+        }
+      ]
+    }
