@@ -7,7 +7,7 @@ metadata:
   namespace: monitoring
   annotations:
     # Specify the cluster issuer created previously to use for the ingress
-    # cert-manager.io/cluster-issuer: letsencrypt-nginx-cert
+    cert-manager.io/cluster-issuer: letsencrypt-nginx-cert
     # nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
     # nginx.ingress.kubernetes.io/ssl-passthrough: "true" # Make pod do SSL termination
     # nginx.ingress.kubernetes.io/backend-protocol: "HTTPS" # Force Ingress to pod communication to be HTTPS
