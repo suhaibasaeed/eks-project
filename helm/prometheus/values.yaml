@@ -371,15 +371,14 @@ server:
   ingress:
     ## If true, Prometheus server Ingress will be created
     ##
-    enabled: false
+    enabled: true
 
-    ingressClassName: ""
+    ingressClassName: nginx
 
     ## Prometheus server Ingress annotations
     ##
-    annotations: {}
-    #   kubernetes.io/ingress.class: nginx
-    #   kubernetes.io/tls-acme: 'true'
+    annotations: 
+      cert-manager.io/cluster-issuer: letsencrypt-nginx-cert
 
     ## Prometheus server Ingress additional labels
     ##
@@ -391,8 +390,8 @@ server:
     ## Prometheus server Ingress hostnames with optional path (passed through tpl)
     ## Must be provided if Ingress is enabled
     ##
-    hosts: []
-    #   - prometheus.domain.com
+    hosts:
+      - prom.samsarian.com
     #   - domain.com/prometheus
 
     path: /
@@ -410,10 +409,10 @@ server:
     ## Prometheus server Ingress TLS configuration (hosts passed through tpl)
     ## Secrets must be manually created in the namespace
     ##
-    tls: []
-    #   - secretName: prometheus-server-tls
-    #     hosts:
-    #       - prometheus.domain.com
+    tls:
+      - secretName: prom-server-tls
+        hosts:
+          - prom.samsarian.com
 
   ## route (map) allows configuration of HTTPRoute resources
   ## Requires Gateway API resources and suitable controller installed within the cluster

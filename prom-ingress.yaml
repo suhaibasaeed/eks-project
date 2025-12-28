@@ -1,4 +1,5 @@
 
+# Not working - had to enable ingress via values.yaml in helm chart
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -9,8 +10,8 @@ metadata:
     # Specify the cluster issuer created previously to use for the ingress
     cert-manager.io/cluster-issuer: letsencrypt-nginx-cert
     # nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
-    # nginx.ingress.kubernetes.io/ssl-passthrough: "true" # Make pod do SSL termination
-    # nginx.ingress.kubernetes.io/backend-protocol: "HTTPS" # Force Ingress to pod communication to be HTTPS
+    nginx.ingress.kubernetes.io/ssl-passthrough: "true" # Make pod do SSL termination
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS" # Force Ingress to pod communication to be HTTPS
 spec:
   tls:
     - hosts:

@@ -3,6 +3,8 @@
 - https://medium.com/@muppedaanvesh/%EF%B8%8F-kubernetes-ingress-securing-the-ingress-using-cert-manager-part-7-366f1f127fd6
 - https://medium.com/@chandan.chanddu/installing-nginx-ingress-controller-in-eks-using-helm-41913011ef49
 - https://medium.com/@KushanJanith/host-your-web-apps-on-eks-with-nginx-ingress-and-external-dns-3721622e271f
+- https://medium.com/@muppedaanvesh/a-hands-on-guide-to-argocd-on-kubernetes-part-1-%EF%B8%8F-7a80c1b0ac98
+- https://medium.com/@akilblanchard09/monitoring-a-kubernetes-cluster-using-prometheus-and-grafana-8e0f21805ea9
 ## Steps
 ### Install ingress-nginx via helm
 1. helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
@@ -415,12 +417,30 @@ f. Apply the storage class and verify it works by creating a PVC and a pod to us
 
 Note: You may need to modify the IMDS response hop limit to 3 as mentioned here: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-IMDS-existing-instances.html#modify-PUT-response-hop-limit (Needs to be verified if this is actually needed for the EBS CSI driver)
 
-#### Continue: Install Prometheus & Grafana for Cluster Monitoring
+#### Continued: Install Prometheus
 7. Update the prometheus values.yaml file to use the new storage class and apply the changes:
 ```
 helm upgrade prometheus ./prometheus --namespace monitoring --values ./prometheus/values.yaml
 ```
 8. Restart the prometheus server and alertmanager deployments to apply the changes: `kubectl rollout restart deployment <deployment-name>`
 9. Verify the pvcs are bound and the prometheus server and alertmanager are running: `kubectl get pvc -n monitoring`
-10. Create ingress for prometheus and check connectivity to the prometheus server:
+10. Create ingress for prometheus by editing values.yaml file and check connectivity to the prometheus server
+11. Connect to the prometheus server and verify the data is being scraped and run a test query. E.g. below checks the top 10 pods by memory usage.
+```
+topk(
+  10,
+  sum by (namespace, pod) (
+    container_memory_working_set_bytes{
+      container!="",
+      container!="POD"
+    }
+  )
+)
+```
+Note: By default we only get metrics exposed by the kube-api server and not custom ones from our apps
+#### Install Grafana for Cluster Monitoring
+1. Add repo for grafana: `helm repo add grafana https://grafana.github.io/helm-charts`
+2. Pull latest releases: `helm repo update`
+3. Pull chart into local dir: helm pull --untar grafana/grafana
+4. Install chart from local dir: helm install grafana ./grafana --namespace monitoring
 
