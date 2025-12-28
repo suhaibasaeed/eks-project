@@ -430,7 +430,7 @@ node:
     name: ebs-csi-node-sa
     annotations: {}
     ## Enable if EKS IAM for SA is used
-    # eks.amazonaws.com/role-arn: arn:<partition>:iam::<account>:role/ebs-csi-role
+    eks.amazonaws.com/role-arn: arn:aws:iam::373894414359:role/AmazonEKS_EBS_CSI_DriverRole
     automountServiceAccountToken: true
     # Disable mutating permissions for the node service account.
     # When enabled, some features of the EBS CSI Driver node pods will not function, such as taint removal.

@@ -383,5 +383,44 @@ spec:
 3. Pull Prometheus chart into local dir: `helm pull --untar prometheus/prometheus`
 4. Install Prometheus chart from local dir: `helm install prometheus ./prometheus --namespace monitoring --create-namespace`
 5. Verify the installation: `kubectl get pods -n monitoring`
+Note: At this point, the prometheus server and alertmanager are not running. This is because the PVCs are still pending as we do not have the EBS CSI driver installed.
 
+#### EBS CSI Driver Installation
+6a. Follow the instructions here to create IAM role for EBS CSI driver: https://docs.aws.amazon.com/eks/latest/userguide/ebs-csi.html#csi-iam-role
+b. Pull and install helm chart for EBS CSI driver:
+```
+helm repo add aws-ebs-csi-driver https://kubernetes-sigs.github.io/aws-ebs-csi-driver
+helm repo update
+helm pull --untar aws-ebs-csi-driver/aws-ebs-csi-driver
+helm install aws-ebs-csi-driver ./aws-ebs-csi-driver --namespace kube-system
+```
+c. At this point the aws-ebs-csi-driver pods are CrashLoopBackOff is not working because we're missing an annotation in the serviceaccount created in 6a. Add the following annotation to the PVCs: `kubectl -n kube-system annotate sa ebs-csi-controller-sa \
+  eks.amazonaws.com/role-arn=arn:aws:iam::<account-id>:role/AmazonEKS_EBS_CSI_DriverRole`
+Note: this can also be done by adding the annotation to the serviceaccount in the helm chart values.yaml file.
+d. Verify the EBS CSI driver is working: `kubectl get pods -n kube-system`
+e. Create a stroage class for the PVCs
+```
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: ebs-gp3-csi
+provisioner: ebs.csi.aws.com
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+parameters:
+  type: gp3
+  fsType: ext4
+```
+f. Apply the storage class and verify it works by creating a PVC and a pod to use it, check in the console to verify the EBS volume has been created.
+
+Note: You may need to modify the IMDS response hop limit to 3 as mentioned here: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-IMDS-existing-instances.html#modify-PUT-response-hop-limit (Needs to be verified if this is actually needed for the EBS CSI driver)
+
+#### Continue: Install Prometheus & Grafana for Cluster Monitoring
+7. Update the prometheus values.yaml file to use the new storage class and apply the changes:
+```
+helm upgrade prometheus ./prometheus --namespace monitoring --values ./prometheus/values.yaml
+```
+8. Restart the prometheus server and alertmanager deployments to apply the changes: `kubectl rollout restart deployment <deployment-name>`
+9. Verify the pvcs are bound and the prometheus server and alertmanager are running: `kubectl get pvc -n monitoring`
+10. Create ingress for prometheus and check connectivity to the prometheus server:
 
