@@ -14,7 +14,10 @@ module "eks" {
     vpc-cni                = {
       before_compute = true
     }
-    aws-ebs-csi-driver     = {}
+    # aws-ebs-csi-driver = {
+    #   addon_version = "v1.53.0-eksbuild.1"
+    # }
+    
   }
 
   # Optional
