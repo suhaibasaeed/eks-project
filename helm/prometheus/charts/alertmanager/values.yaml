@@ -312,17 +312,17 @@ configAnnotations: {}
 
 config:
   enabled: true
-  global: {}
-    # slack_api_url: ''
+  global:
+    slack_api_url: https://hooks.slack.com/triggers/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
 
   templates:
     - '/etc/alertmanager/*.tmpl'
 
   receivers:
     - name: default-receiver
-      # slack_configs:
-      #  - channel: '@you'
-      #    send_resolved: true
+      slack_configs:
+       - channel: '#netops-infra-alerts'
+         send_resolved: true
 
   route:
     group_wait: 10s

@@ -450,5 +450,107 @@ Note: By default we only get metrics exposed by the kube-api server and not cust
 8. Connect Prometheus to Grafana as a data source, we'll need to point it to the prometheus-server service. Follow the instructions here: https://medium.com/@akilblanchard09/monitoring-a-kubernetes-cluster-using-prometheus-and-grafana-8e0f21805ea9
 9. Import the default dashboard by clicking on the + icon in the top left corner and selecting "Import". Use ID: `3662`
 #### Setup Alert manager rules
-10. Create alerts by creating a new values file for helm that contains the alerting rules. 
+10. Create alerts by creating a new values file in the prometheus folder for helm that contains the alerting rules. E.g. `helm/prometheus/values-alerts.yaml`
+```yaml
+serverFiles:
+  alerting_rules.yml:
+    groups:
+      - name: my-pod-demo-rules
+        rules:
+          - alert: KubernetesPodNotHealthy
+            expr: sum by (namespace, pod) (kube_pod_status_phase{phase=~"Pending|Unknown|Failed"}) > 0
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: Kubernetes Pod not healthy (instance {{ $labels.instance }})
+              description: >-
+                Pod {{ $labels.namespace }}/{{ $labels.pod }} has been in a non-running state for longer than 15 minutes.
+                  VALUE = {{ $value }}
+                  LABELS = {{ $labels }}
+
+          - alert: KubernetesDaemonsetRolloutStuck
+            expr: kube_daemonset_status_number_ready / kube_daemonset_status_desired_number_scheduled * 100 < 100 or kube_daemonset_status_desired_number_scheduled - kube_daemonset_status_current_number_scheduled > 0
+            for: 10m
+            labels:
+              severity: warning
+            annotations:
+              summary: Kubernetes DaemonSet rollout stuck (instance {{ $labels.instance }})
+              description: >-
+                Some Pods of DaemonSet {{ $labels.namespace }}/{{ $labels.daemonset }} are not scheduled or not ready
+                  VALUE = {{ $value }}
+                  LABELS = {{ $labels }}
+
+          - alert: ContainerHighCpuUtilization
+            expr: (sum(rate(container_cpu_usage_seconds_total{container!=""}[5m])) by (pod, container) / sum(container_spec_cpu_quota{container!=""}/container_spec_cpu_period{container!=""}) by (pod, container) * 100) > 80
+            for: 2m
+            labels:
+              severity: warning
+            annotations:
+              summary: Container High CPU utilization (instance {{ $labels.instance }})
+              description: >-
+                Container CPU utilization is above 80%
+                  VALUE = {{ $value }}
+                  LABELS = {{ $labels }}
+
+          - alert: ContainerHighMemoryUsage
+            expr: (sum(container_memory_working_set_bytes{name!=""}) BY (instance, name) / sum(container_spec_memory_limit_bytes > 0) BY (instance, name) * 100) > 80
+            for: 2m
+            labels:
+              severity: warning
+            annotations:
+              summary: Container High Memory usage (instance {{ $labels.instance }})
+              description: >-
+                Container Memory usage is above 80%
+                  VALUE = {{ $value }}
+                  LABELS = {{ $labels }}
+
+          - alert: KubernetesContainerOomKiller
+            expr: (kube_pod_container_status_restarts_total - kube_pod_container_status_restarts_total offset 10m >= 1) and ignoring (reason) min_over_time(kube_pod_container_status_last_terminated_reason{reason="OOMKilled"}[10m]) == 1
+            for: 0m
+            labels:
+              severity: warning
+            annotations:
+              summary: Kubernetes Container oom killer (instance {{ $labels.instance }})
+              description: >-
+                Container {{ $labels.container }} in pod {{ $labels.namespace }}/{{ $labels.pod }} has been OOMKilled {{ $value }} times in the last 10 minutes.
+                  VALUE = {{ $value }}
+                  LABELS = {{ $labels }}
+
+          - alert: KubernetesPodCrashLooping
+            expr: increase(kube_pod_container_status_restarts_total[1m]) > 3
+            for: 2m
+            labels:
+              severity: warning
+            annotations:
+              summary: Kubernetes pod crash looping (instance {{ $labels.instance }})
+              description: >-
+                Pod {{ $labels.namespace }}/{{ $labels.pod }} is crash looping
+                  VALUE = {{ $value }}
+                  LABELS = {{ $labels }}
+```
+11. Update the prometheus deployment with the new alerting rules: `helm upgrade -n monitoring prometheus ./prometheus --values helm/prometheus/values-alerts.yaml`
+12. Log into prometheus and verify the alerts have been created. Do this by setting up ingress or port-forwarding to the prometheus server.
+```bash
+$ export POD_NAME=$(kubectl get pods --namespace monitoring -l "app.kubernetes.io/$name=alertmanager,app.kubernetes.io/instance=prometheus" -o jsonpath="{.items[0].metadata.name}")
+$ kubectl --namespace monitoring port-forward $POD_NAME 9093
+```
+13. Test the alerts by creating a faulty new pod and verify the alert is firing. E.g. `k run new-pod --image=nginxscedd
+#### Setup Slack Alerts
+14. Create a new slack channel and get the webhook url from the slack app.
+15. Update the alertmanager values.yaml file to include the slack webhook url and fill out the receiver name and channel: `helm/prometheus/charts/alertmanager/values.yaml`
+```
+global:
+  slack_api_url: <slack_webhook_url>
+
+receivers:
+    - name: default-receiver
+      slack_configs:
+       - channel: '#netops-infra-alerts'
+         send_resolved: true
+```
+16. Update the prometheus deployment with the new alertmanager values: `helm upgrade -n monitoring prometheus ./prometheus --values helm/prometheus/values-alerts.yaml`
+17. Restart the alertmanager stateful set: `k rollout restart statefulset -n monitoring alertmanager`
+18. Test the alerts by creating a faulty new pod and verify the alert is firing. E.g. `k run new-pod --image=nginxscedd
+
 
