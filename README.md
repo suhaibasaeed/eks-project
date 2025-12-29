@@ -443,4 +443,12 @@ Note: By default we only get metrics exposed by the kube-api server and not cust
 2. Pull latest releases: `helm repo update`
 3. Pull chart into local dir: helm pull --untar grafana/grafana
 4. Install chart from local dir: helm install grafana ./grafana --namespace monitoring
+5. Verify the installation: kubectl get pods -n monitoring
+6. Create ingress for grafana by editing values.yaml file and check connectivity to the grafana server
+7. Get the admin password and login to grafana: `kubectl get secret --namespace monitoring grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo`
+#### Setup Grafana Dashboard
+8. Connect Prometheus to Grafana as a data source, we'll need to point it to the prometheus-server service. Follow the instructions here: https://medium.com/@akilblanchard09/monitoring-a-kubernetes-cluster-using-prometheus-and-grafana-8e0f21805ea9
+9. Import the default dashboard by clicking on the + icon in the top left corner and selecting "Import". Use ID: `3662`
+#### Setup Alert manager rules
+10. Create alerts by creating a new values file for helm that contains the alerting rules. 
 
