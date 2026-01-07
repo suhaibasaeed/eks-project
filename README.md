@@ -1,10 +1,15 @@
 # EKS Project
-## Sources
-- https://medium.com/@muppedaanvesh/%EF%B8%8F-kubernetes-ingress-securing-the-ingress-using-cert-manager-part-7-366f1f127fd6
-- https://medium.com/@chandan.chanddu/installing-nginx-ingress-controller-in-eks-using-helm-41913011ef49
-- https://medium.com/@KushanJanith/host-your-web-apps-on-eks-with-nginx-ingress-and-external-dns-3721622e271f
-- https://medium.com/@muppedaanvesh/a-hands-on-guide-to-argocd-on-kubernetes-part-1-%EF%B8%8F-7a80c1b0ac98
-- https://medium.com/@akilblanchard09/monitoring-a-kubernetes-cluster-using-prometheus-and-grafana-8e0f21805ea9
+## Overview
+
+This project provides a comprehensive guide for setting up, deploying, and monitoring an Amazon EKS (Elastic Kubernetes Service) cluster using Terraform. It includes instructions for:
+
+- Installing and configuring the nginx ingress controller with Helm.
+- Installing and configuring cert-manager for SSL certificate management and secure ingress traffic via TLS.
+- Installing and configuring External DNS for dynamic DNS record management.
+- Installing and configuring ArgoCD for GitOps continuous delivery.
+- Implementing robust monitoring with Prometheus and Grafana, including custom alerting rules for container health and resource usage.
+- Setting up alert notifications via Slack to enhance observability and incident response.
+
 ## Steps
 ### Install ingress-nginx via helm
 1. helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
@@ -189,7 +194,7 @@ spec:
             path: /
 ```
 8. Apply the ingress resource: `kubectl apply -f test-secure-ingress.yaml`
-9. Verify certificate has been created `kubectl describe certificate
+9. Verify certificate has been created `kubectl describe certificate`
 ```
 kubectl describe certificate
 Name:         letsencrypt-nginx-cert-samsarian
@@ -279,7 +284,7 @@ serviceAccount:
   create: true
   name: external-dns
   annotations:
-    eks.amazonaws.com/role-arn: arn:aws:iam::XXXXXXXXXXX:role/<iam_role_name>
+    eks.amazonaws.com/role-arn: arn:aws:iam::XXXXXXXXXXX:role/<iam_role_name> # Replace with the IAM role ARN created in step 3
 txtOwnerId: <name_of_your_cluster>
 
 ```
@@ -397,10 +402,10 @@ helm pull --untar aws-ebs-csi-driver/aws-ebs-csi-driver
 helm install aws-ebs-csi-driver ./aws-ebs-csi-driver --namespace kube-system
 ```
 c. At this point the aws-ebs-csi-driver pods are CrashLoopBackOff is not working because we're missing an annotation in the serviceaccount created in 6a. Add the following annotation to the PVCs: `kubectl -n kube-system annotate sa ebs-csi-controller-sa \
-  eks.amazonaws.com/role-arn=arn:aws:iam::<account-id>:role/AmazonEKS_EBS_CSI_DriverRole`
+  eks.amazonaws.com/role-arn=arn:aws:iam::<account-id>:role/AmazonEKS_EBS_CSI_DriverRole`  
 Note: this can also be done by adding the annotation to the serviceaccount in the helm chart values.yaml file.
-d. Verify the EBS CSI driver is working: `kubectl get pods -n kube-system`
-e. Create a stroage class for the PVCs
+d. Verify the EBS CSI driver is working: `kubectl get pods -n kube-system`  
+e. Create a storage class for the PVCs
 ```
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
@@ -546,7 +551,7 @@ global:
 receivers:
     - name: default-receiver
       slack_configs:
-       - channel: '#netops-infra-alerts'
+       - channel: '#netops-infra-alerts' # Name of the slack channel to send alerts to
          send_resolved: true
 ```
 16. Update the prometheus deployment with the new alertmanager values: `helm upgrade -n monitoring prometheus ./prometheus --values helm/prometheus/values-alerts.yaml`
@@ -554,3 +559,9 @@ receivers:
 18. Test the alerts by creating a faulty new pod and verify the alert is firing. E.g. `k run new-pod --image=nginxscedd
 
 
+## Sources
+- https://medium.com/@muppedaanvesh/%EF%B8%8F-kubernetes-ingress-securing-the-ingress-using-cert-manager-part-7-366f1f127fd6
+- https://medium.com/@chandan.chanddu/installing-nginx-ingress-controller-in-eks-using-helm-41913011ef49
+- https://medium.com/@KushanJanith/host-your-web-apps-on-eks-with-nginx-ingress-and-external-dns-3721622e271f
+- https://medium.com/@muppedaanvesh/a-hands-on-guide-to-argocd-on-kubernetes-part-1-%EF%B8%8F-7a80c1b0ac98
+- https://medium.com/@akilblanchard09/monitoring-a-kubernetes-cluster-using-prometheus-and-grafana-8e0f21805ea9
